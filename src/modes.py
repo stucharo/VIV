@@ -1,10 +1,13 @@
 from collections import namedtuple
 from dataclasses import dataclass
+import glob
 import math
 from textwrap import dedent
 import subprocess
 from pathlib import Path
 
+import numpy as np
+import matplotlib.pyplot as plt
 
 Seabed = namedtuple("Seabed", "K_vert_sta K_ax_dyn K_vert_dyn K_lat_dyn mu_ax")
 
@@ -377,13 +380,13 @@ def write_modal_pp_file(model_path):
 
                 freqs = []
 
-                for m in range(modes - 1):
-                    f = s.frames[m + 1]
+                for m in range(1, modes):
+                    f = s.frames[m]
                     freqs.append(f.frequency)
-                    ms = np.zeros((len(nodes) - 1, 3))
-                    for n in range(len(nodes) - 1):
+                    ms = np.zeros((len(nodes), 3))
+                    for n in range(len(nodes)):
                         ms[n, :] = f.fieldOutputs["U"].values[n].data
-                    fname = "mode_{0}.dat".format(m + 1)
+                    fname = "mode_{0}.dat".format(m)
                     np.savetxt(fname, ms, delimiter=",")
 
                 np.savetxt("freqs.dat", freqs, delimiter=",")
@@ -398,7 +401,7 @@ def cli(input_file_path, model_path=None):
 
     if model_path is None:
         model_path = os.getcwd()
-    
+
     f = Path(input_file_path)
     with open(f, "rb") as i:
         inputs = tomllib.load(i)
@@ -408,6 +411,47 @@ def cli(input_file_path, model_path=None):
     seabed = Seabed(**inputs["Seabed"])
 
     get_mode_shapes(model_path, model, pipe, seabed)
+
+
+def get_modes(model_path):
+    nf = read_natural_freqs(model_path)
+    modes = read_mode_shapes(model_path)
+
+    for k, v in modes.items():
+        modes[k] = {"mode_shape": modes[k], "frequency": nf[k - 1]}
+
+    return modes
+
+
+def read_natural_freqs(model_path):
+    with open(model_path / "freqs.dat", "r") as f:
+        freqs = [float(n.strip()) for n in f.readlines()]
+
+    return freqs
+
+
+def read_mode_shapes(model_path):
+    modes = {}
+    mode_shape_files = glob.glob("mode_*.dat", root_dir=model_path)
+
+    for msf in mode_shape_files:
+        ms = np.loadtxt(model_path / msf, delimiter=",")
+        mode_number = int(msf[msf.find("_") + 1 : msf.find(".")])
+        modes[mode_number] = ms
+
+    return dict(sorted(modes.items()))
+
+
+def is_axial_mode(mode):
+    max_axial_disp = np.max(mode[:, 0])
+    max_vertical_disp = np.max(mode[:, 1])
+    max_lateral_disp = np.max(mode[:, 2])
+
+    if max_axial_disp > max_vertical_disp and max_axial_disp > max_lateral_disp:
+        return True
+    return False
+
+
 
 
 if __name__ == "__main__":

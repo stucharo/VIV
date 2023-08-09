@@ -11,13 +11,13 @@ modes = len(s.frames)
 
 freqs = []
 
-for m in range(modes - 1):
-    f = s.frames[m + 1]
+for m in range(1, modes):
+    f = s.frames[m]
     freqs.append(f.frequency)
-    ms = np.zeros((len(nodes) - 1, 3))
-    for n in range(len(nodes) - 1):
+    ms = np.zeros((len(nodes), 3))
+    for n in range(len(nodes)):
         ms[n, :] = f.fieldOutputs["U"].values[n].data
-    fname = "mode_{0}.dat".format(m + 1)
+    fname = "mode_{0}.dat".format(m)
     np.savetxt(fname, ms, delimiter=",")
 
 np.savetxt("freqs.dat", freqs, delimiter=",")

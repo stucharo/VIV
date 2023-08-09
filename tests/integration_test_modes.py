@@ -10,7 +10,7 @@ def test_get_mode_shapes(tmp_path, seabed, model, pipe):
         pipe,
         seabed,
     )
-    
+
     assert filecmp.cmp(
         Path(tmp_path, "in_place_pp.py"), Path("tests/refs/in_place_pp.py")
     )
@@ -27,7 +27,7 @@ def test_get_mode_shapes(tmp_path, seabed, model, pipe):
 
 def test_cli(tmp_path):
     m.cli("tests\\refs\\viv.toml", tmp_path)
-    
+
     assert filecmp.cmp(
         Path(tmp_path, "in_place_pp.py"), Path("tests/refs/in_place_pp.py")
     )

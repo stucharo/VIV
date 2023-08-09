@@ -1,0 +1,1 @@
+pytest tests\integration_test_modes.py

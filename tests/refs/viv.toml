@@ -19,7 +19,7 @@ mu_ax = 0.5
 [Model]
 span_length = 40
 span_height = 1
-total_length = 400
+total_length = 200
 element_length = 1
 g = 9.80665
 water_depth = 150
