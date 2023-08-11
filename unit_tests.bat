@@ -1,1 +1,1 @@
-pytest tests/
+pytest --cov-report html --cov=src/ tests/

@@ -58,6 +58,7 @@ def get_mode_shapes(
     pp_in_place(model_path)
     run_modal(model_path, pipe, seabed, model)
     pp_modal(model_path)
+    plot_modes(model_path, model.element_length)
 
 
 def run_in_place(
@@ -413,12 +414,47 @@ def cli(input_file_path, model_path=None):
     get_mode_shapes(model_path, model, pipe, seabed)
 
 
+def plot_modes(model_path, element_length):
+    modes = get_modes(model_path)
+    pts = modes[1]["mode_shape"].shape[0]
+    x = np.linspace(0, (pts - 1) * element_length, pts)
+
+    fig, ax = plt.subplots(figsize=(8, 5), layout="constrained")
+
+    labels = []
+
+    for k, v in modes.items():
+        d = v["direction"]
+        if d == "inline":
+            color = "b"
+            l = "Inline"
+        elif d == "cross-flow":
+            color = "g"
+            l = "Cross Flow"
+        else:
+            color = "r"
+            l = "Axial"
+        label = f"Mode {k} - {v['frequency']:.2f} Hz ({l})"
+        labels.append(label)
+        ax.plot(x, k + v["mode_shape"][:, 0] * 0.4, color=color, label=label)
+
+    ax.set_yticks(list(modes.keys()))
+    ax.set_xlabel("KP (m)")
+    ax.set_ylabel("Mode")
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(
+        handles[::-1], labels[::-1], title="Frequencies", loc="outside right upper"
+    )
+    plt.title("Mode Shapes")
+    plt.savefig("mode_shapes.png")
+
+
 def get_modes(model_path):
     nf = read_natural_freqs(model_path)
     modes = read_mode_shapes(model_path)
 
-    for k, v in modes.items():
-        modes[k] = {"mode_shape": modes[k], "frequency": nf[k - 1]}
+    for k in modes.keys():
+        modes[k]["frequency"] = nf[k - 1]
 
     return modes
 
@@ -437,21 +473,32 @@ def read_mode_shapes(model_path):
     for msf in mode_shape_files:
         ms = np.loadtxt(model_path / msf, delimiter=",")
         mode_number = int(msf[msf.find("_") + 1 : msf.find(".")])
-        modes[mode_number] = ms
+        modes[mode_number] = {
+            "mode_shape": rotate_mode(ms),
+            "direction": get_direction(ms),
+        }
 
     return dict(sorted(modes.items()))
 
 
-def is_axial_mode(mode):
-    max_axial_disp = np.max(mode[:, 0])
-    max_vertical_disp = np.max(mode[:, 1])
-    max_lateral_disp = np.max(mode[:, 2])
 
-    if max_axial_disp > max_vertical_disp and max_axial_disp > max_lateral_disp:
-        return True
-    return False
+def rotate_mode(ms):
+    max_amplitude = np.argmax(np.sqrt(ms[:, 1] ** 2 + ms[:, 2] ** 2))
+    angle = -np.arctan2(ms[max_amplitude, 1], ms[max_amplitude, 2])
+
+    _x = np.cos(angle) * ms[:, 2] - np.sin(angle) * ms[:, 1]
+    _y = np.sin(angle) * ms[:, 2] + np.cos(angle) * ms[:, 1]
+
+    return np.vstack((_x, _y)).T
 
 
+def get_direction(ms):
+    d = np.unravel_index(np.argmax(ms), ms.shape)[1]
+    if d == 0:
+        return "axial"
+    if d == 1:
+        return "cross-flow"
+    return "inline"
 
 
 if __name__ == "__main__":

@@ -196,6 +196,10 @@ def test_pp_modal(tmp_path, mocker):
 
 def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
     shutil.copyfile(Path("tests/refs/gaps.dat"), Path(tmp_path, "gaps.dat"))
+    ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
+    for f in ref_mode_shape_files:
+        shutil.copyfile(Path("tests/refs", f), Path(tmp_path, f))
+    shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
 
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
@@ -272,9 +276,11 @@ def test_read_mode_shape_files(tmp_path):
     modes = m.read_mode_shapes(tmp_path)
 
     assert len(modes.keys()) == len(ref_mode_shape_files)
-    for _, v in modes.items():
-        assert type(v) is np.ndarray
-        assert v.shape[1] == 3
+    for k, v in modes.items():
+        assert type(v["mode_shape"]) is np.ndarray
+        assert v["mode_shape"].shape[1] == 2
+        print(k)
+        assert v["direction"] == REF_DIRS[k]
 
 
 def test_get_modes(tmp_path):
@@ -290,6 +296,39 @@ def test_get_modes(tmp_path):
     freqs = np.array([(k, actual[k]["frequency"]) for k in actual.keys()])
     for i in [0, 1]:
         assert np.all(np.diff(freqs[:, i]) > 0)
+
+
+def test_plot_modes(tmp_path, model, mocker):
+    ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
+    for f in ref_mode_shape_files:
+        shutil.copyfile(Path("tests/refs", f), Path(tmp_path, f))
+    shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
+
+    mocked_savefig = mocker.patch("src.modes.plt.savefig")
+
+    m.plot_modes(tmp_path, model.element_length)
+
+    mocked_savefig.assert_called_once_with("mode_shapes.png") 
+
+
+def test_get_direction(mode_shape):
+
+    d = m.get_direction(mode_shape)
+    assert d == 'inline'
+
+    ms_1 = np.copy(mode_shape[:,1])
+    mode_shape[:,1] = mode_shape[:,2]
+    mode_shape[:,2] = ms_1
+    d = m.get_direction(mode_shape)
+    assert d == 'cross-flow'
+
+    ms_1 = np.copy(mode_shape[:,1])
+    mode_shape[:,1] = mode_shape[:,0]
+    mode_shape[:,0] = ms_1
+    d = m.get_direction(mode_shape)
+    assert d == 'axial'
+
+    # assert False
 
 REF_GAPS = [
     (1, -5.792e-03),
@@ -517,3 +556,26 @@ REF_FREQS = [
     1.454400000000000048e01,
     1.471799999999999997e01,
 ]
+
+REF_DIRS = {
+    1: "inline",
+    2: "cross-flow",
+    3: "cross-flow",
+    4: "inline",
+    5: "cross-flow",
+    6: "inline",
+    7: "cross-flow",
+    8: "cross-flow",
+    9: "inline",
+    10: "inline",
+    11: "cross-flow",
+    12: "inline",
+    13: "cross-flow",
+    14: "inline",
+    15: "axial",
+    16: "cross-flow",
+    17: "cross-flow",
+    18: "inline",
+    19: "inline",
+    20: "cross-flow",
+}

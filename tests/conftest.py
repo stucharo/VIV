@@ -1,5 +1,7 @@
 import pytest
 
+import numpy as np
+
 import src.modes as m
 
 
@@ -40,4 +42,17 @@ def pipe():
 def model():
     return m.Model(
         span_length, span_height, total_length, element_length, g, water_depth, rho_sw
+    )
+
+
+@pytest.fixture
+def mode_shape():
+    return np.array(
+        [
+            [0, 0, 0],
+            [0, 0, np.sin(np.pi / 4)],
+            [0, 0, 1],
+            [0, 0, np.sin(3 * np.pi / 4)],
+            [0, 0, 0],
+        ]
     )
