@@ -481,7 +481,6 @@ def read_mode_shapes(model_path):
     return dict(sorted(modes.items()))
 
 
-
 def rotate_mode(ms):
     max_amplitude = np.argmax(np.sqrt(ms[:, 1] ** 2 + ms[:, 2] ** 2))
     angle = -np.arctan2(ms[max_amplitude, 1], ms[max_amplitude, 2])

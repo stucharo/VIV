@@ -308,27 +308,27 @@ def test_plot_modes(tmp_path, model, mocker):
 
     m.plot_modes(tmp_path, model.element_length)
 
-    mocked_savefig.assert_called_once_with("mode_shapes.png") 
+    mocked_savefig.assert_called_once_with("mode_shapes.png")
 
 
 def test_get_direction(mode_shape):
-
     d = m.get_direction(mode_shape)
-    assert d == 'inline'
+    assert d == "inline"
 
-    ms_1 = np.copy(mode_shape[:,1])
-    mode_shape[:,1] = mode_shape[:,2]
-    mode_shape[:,2] = ms_1
+    ms_1 = np.copy(mode_shape[:, 1])
+    mode_shape[:, 1] = mode_shape[:, 2]
+    mode_shape[:, 2] = ms_1
     d = m.get_direction(mode_shape)
-    assert d == 'cross-flow'
+    assert d == "cross-flow"
 
-    ms_1 = np.copy(mode_shape[:,1])
-    mode_shape[:,1] = mode_shape[:,0]
-    mode_shape[:,0] = ms_1
+    ms_1 = np.copy(mode_shape[:, 1])
+    mode_shape[:, 1] = mode_shape[:, 0]
+    mode_shape[:, 0] = ms_1
     d = m.get_direction(mode_shape)
-    assert d == 'axial'
+    assert d == "axial"
 
     # assert False
+
 
 REF_GAPS = [
     (1, -5.792e-03),
