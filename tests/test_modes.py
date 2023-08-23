@@ -327,8 +327,6 @@ def test_get_direction(mode_shape):
     d = m.get_direction(mode_shape)
     assert d == "axial"
 
-    # assert False
-
 
 REF_GAPS = [
     (1, -5.792e-03),
