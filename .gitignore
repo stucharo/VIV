@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+# Abaqus files
+*.com
+*.msg
+*.odb
+*.prt
+*.sim
+*.sta
+*.fil
+
 # Distribution / packaging
 .Python
 build/
