@@ -12,9 +12,10 @@ T = 10
 [Seabed]
 K_vert_sta = 2e5
 K_ax_dyn = 1e6
-K_vert_dyn = 2e6
-K_lat_dyn = 3e6
 mu_ax = 0.5
+C_V = 14500e3
+C_L = 12500e3
+nu = 0.35
 
 [Model]
 span_length = 40
@@ -24,3 +25,6 @@ element_length = 1
 g = 9.80665
 water_depth = 150
 rho_sw = 1025
+
+[System]
+abaqus_bat_path = "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat"

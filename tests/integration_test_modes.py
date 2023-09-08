@@ -3,12 +3,13 @@ import filecmp
 from pathlib import Path
 
 
-def test_get_mode_shapes(tmp_path, seabed, model, pipe):
+def test_get_mode_shapes(tmp_path, seabed, model, pipe, system):
     m.get_mode_shapes(
         tmp_path,
         model,
         pipe,
         seabed,
+        system,
     )
 
     assert filecmp.cmp(

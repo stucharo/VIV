@@ -13,28 +13,39 @@ import numpy as np
 
 
 def test_Seabed():
-    s = m.Seabed(ct.K_vert_sta, ct.K_ax_dyn, ct.K_vert_dyn, ct.K_lat_dyn, ct.mu_ax)
-    assert s.K_vert_sta == ct.K_vert_sta
-    assert s.K_ax_dyn == ct.K_ax_dyn
-    assert s.K_vert_dyn == ct.K_vert_dyn
-    assert s.K_lat_dyn == ct.K_lat_dyn
-    assert s.mu_ax == ct.mu_ax
+    s = m.Seabed(**ct.inputs["Seabed"])
+    assert s.K_vert_sta == ct.inputs["Seabed"]["K_vert_sta"]
+    assert s.K_ax_dyn == ct.inputs["Seabed"]["K_ax_dyn"]
+    assert s.mu_ax == ct.inputs["Seabed"]["mu_ax"]
+    assert s.C_V == ct.inputs["Seabed"]["C_V"]
+    assert s.C_L == ct.inputs["Seabed"]["C_L"]
+    assert s.nu == ct.inputs["Seabed"]["nu"]
 
 
 def test_Pipe():
-    p = m.Pipe(
-        ct.od, ct.wt, ct.E, ct.nu, ct.alpha, ct.rho_steel, ct.rho_contents, ct.Pi, ct.T
-    )
+    p = m.Pipe(**ct.inputs["Pipe"])
 
-    assert p.od == ct.od
-    assert p.wt == ct.wt
-    assert p.E == ct.E
-    assert p.nu == ct.nu
-    assert p.alpha == ct.alpha
-    assert p.rho_steel == ct.rho_steel
-    assert p.rho_contents == ct.rho_contents
-    assert p.Pi == ct.Pi
-    assert p.T == ct.T
+    assert p.od == ct.inputs["Pipe"]["od"]
+    assert p.wt == ct.inputs["Pipe"]["wt"]
+    assert p.E == ct.inputs["Pipe"]["E"]
+    assert p.nu == ct.inputs["Pipe"]["nu"]
+    assert p.alpha == ct.inputs["Pipe"]["alpha"]
+    assert p.rho_steel == ct.inputs["Pipe"]["rho_steel"]
+    assert p.rho_contents == ct.inputs["Pipe"]["rho_contents"]
+    assert p.Pi == ct.inputs["Pipe"]["Pi"]
+    assert p.T == ct.inputs["Pipe"]["T"]
+
+
+def test_Model():
+    mod = m.Model(**ct.inputs["Model"])
+
+    assert mod.span_length == ct.inputs["Model"]["span_length"]
+    assert mod.span_height == ct.inputs["Model"]["span_height"]
+    assert mod.total_length == ct.inputs["Model"]["total_length"]
+    assert mod.element_length == ct.inputs["Model"]["element_length"]
+    assert mod.g == ct.inputs["Model"]["g"]
+    assert mod.water_depth == ct.inputs["Model"]["water_depth"]
+    assert mod.rho_sw == ct.inputs["Model"]["rho_sw"]
 
 
 def test_get_A():
@@ -56,26 +67,6 @@ def test_Pipe_get_sigma_ax(pipe):
     assert actual == pytest.approx(expected)
 
 
-def test_Model():
-    mod = m.Model(
-        ct.span_length,
-        ct.span_height,
-        ct.total_length,
-        ct.element_length,
-        ct.g,
-        ct.water_depth,
-        ct.rho_sw,
-    )
-
-    assert mod.span_length == ct.span_length
-    assert mod.span_height == ct.span_height
-    assert mod.total_length == ct.total_length
-    assert mod.element_length == ct.element_length
-    assert mod.g == ct.g
-    assert mod.water_depth == ct.water_depth
-    assert mod.rho_sw == ct.rho_sw
-
-
 def test_write_in_place_pp_file(tmp_path):
     m.write_in_place_pp_file(tmp_path)
 
@@ -90,15 +81,15 @@ def test_write_in_place_input_file(tmp_path, pipe, model, seabed):
     assert filecmp.cmp(Path(tmp_path, "in_place.inp"), Path("tests/refs/in_place.inp"))
 
 
-def test_run_in_place(tmp_path, mocker, pipe, model, seabed):
+def test_run_in_place(tmp_path, mocker, pipe, model, seabed, system):
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
-    m.run_in_place(tmp_path, model, pipe, seabed)
+    m.run_in_place(tmp_path, model, pipe, seabed, system)
 
     assert filecmp.cmp(Path(tmp_path, "in_place.inp"), Path("tests/refs/in_place.inp"))
     mocked_subprocess_run.assert_called_once_with(
         [
-            "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+            system.abaqus_bat_path,
             "j=in_place",
             "ask_delete=no",
             "cpus=2",
@@ -108,16 +99,16 @@ def test_run_in_place(tmp_path, mocker, pipe, model, seabed):
     )
 
 
-def test_pp_in_place(tmp_path, mocker):
+def test_pp_in_place(tmp_path, mocker, system):
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
-    m.pp_in_place(tmp_path)
+    m.pp_in_place(tmp_path, system)
 
     assert filecmp.cmp(
         Path(tmp_path, "in_place_pp.py"), Path("tests/refs/in_place_pp.py")
     )
     mocked_subprocess_run.assert_called_once_with(
-        ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "in_place_pp.py"],
+        [system.abaqus_bat_path, "python", "in_place_pp.py"],
         cwd=tmp_path,
     )
 
@@ -156,17 +147,17 @@ def test_write_modal_inp(tmp_path, seabed, pipe, model):
     assert filecmp.cmp(Path(tmp_path, "modal.inp"), Path("tests/refs/modal.inp"))
 
 
-def test_run_modal(tmp_path, mocker, seabed, pipe, model):
+def test_run_modal(tmp_path, mocker, seabed, pipe, model, system):
     shutil.copyfile(Path("tests/refs/gaps.dat"), Path(tmp_path, "gaps.dat"))
 
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
-    m.run_modal(tmp_path, pipe, seabed, model)
+    m.run_modal(tmp_path, pipe, seabed, model, system)
 
     assert filecmp.cmp(Path(tmp_path, "modal.inp"), Path("tests/refs/modal.inp"))
     mocked_subprocess_run.assert_called_once_with(
         [
-            "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+            system.abaqus_bat_path,
             "j=modal",
             "ask_delete=no",
             "cpus=2",
@@ -182,19 +173,19 @@ def test_write_modal_pp_file(tmp_path):
     assert filecmp.cmp(Path(tmp_path, "modal_pp.py"), Path("tests/refs/modal_pp.py"))
 
 
-def test_pp_modal(tmp_path, mocker):
+def test_pp_modal(tmp_path, mocker, system):
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
-    m.pp_modal(tmp_path)
+    m.pp_modal(tmp_path, system)
 
     assert filecmp.cmp(Path(tmp_path, "modal_pp.py"), Path("tests/refs/modal_pp.py"))
     mocked_subprocess_run.assert_called_once_with(
-        ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "modal_pp.py"],
+        [system.abaqus_bat_path, "python", "modal_pp.py"],
         cwd=tmp_path,
     )
 
 
-def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
+def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model, system):
     shutil.copyfile(Path("tests/refs/gaps.dat"), Path(tmp_path, "gaps.dat"))
     ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
     for f in ref_mode_shape_files:
@@ -208,12 +199,13 @@ def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
         model,
         pipe,
         seabed,
+        system,
     )
 
     calls = [
         call(
             [
-                "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+                system.abaqus_bat_path,
                 "j=in_place",
                 "ask_delete=no",
                 "cpus=2",
@@ -222,12 +214,12 @@ def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
             cwd=tmp_path,
         ),
         call(
-            ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "in_place_pp.py"],
+            [system.abaqus_bat_path, "python", "in_place_pp.py"],
             cwd=tmp_path,
         ),
         call(
             [
-                "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+                system.abaqus_bat_path,
                 "j=modal",
                 "ask_delete=no",
                 "cpus=2",
@@ -236,7 +228,7 @@ def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
             cwd=tmp_path,
         ),
         call(
-            ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "modal_pp.py"],
+            [system.abaqus_bat_path, "python", "modal_pp.py"],
             cwd=tmp_path,
         ),
     ]
@@ -251,12 +243,14 @@ def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model):
     assert filecmp.cmp(Path(tmp_path, "modal_pp.py"), Path("tests/refs/modal_pp.py"))
 
 
-def test_cli(mocker, model, pipe, seabed):
+def test_cli(mocker, model, pipe, seabed, system):
     mocked_get_mode_shapes = mocker.patch("src.modes.get_mode_shapes")
 
     m.cli("tests\\refs\\viv.toml")
 
-    mocked_get_mode_shapes.assert_called_once_with(os.getcwd(), model, pipe, seabed)
+    mocked_get_mode_shapes.assert_called_once_with(
+        os.getcwd(), model, pipe, seabed, system
+    )
 
 
 def test_read_natural_freqs(tmp_path):
@@ -308,7 +302,7 @@ def test_plot_modes(tmp_path, model, mocker):
 
     m.plot_modes(tmp_path, model.element_length)
 
-    mocked_savefig.assert_called_once_with("mode_shapes.png")
+    mocked_savefig.assert_called_once_with(Path(tmp_path / "mode_shapes.png"))
 
 
 def test_get_direction(mode_shape):
@@ -326,6 +320,20 @@ def test_get_direction(mode_shape):
     mode_shape[:, 0] = ms_1
     d = m.get_direction(mode_shape)
     assert d == "axial"
+
+
+def test_get_K_V_d(pipe, seabed, model):
+    actual = m.get_K_V_d(pipe, seabed, model)
+    expected = 1.823548734e7
+
+    assert actual == pytest.approx(expected)
+
+
+def test_get_K_L_d(pipe, seabed, model):
+    actual = m.get_K_L_d(pipe, seabed, model)
+    expected = 1.379451736e7
+
+    assert actual == pytest.approx(expected)
 
 
 REF_GAPS = [
@@ -533,45 +541,45 @@ REF_GAPS = [
 ]
 
 REF_FREQS = [
-    1.101099999999999968e00,
-    1.314799999999999969e00,
-    2.632699999999999818e00,
-    2.704299999999999926e00,
-    4.775800000000000267e00,
-    4.950199999999999712e00,
-    5.438399999999999679e00,
-    5.556899999999999729e00,
-    5.840200000000000280e00,
-    5.920899999999999608e00,
-    7.688200000000000145e00,
-    7.925500000000000433e00,
-    1.095199999999999996e01,
-    1.135299999999999976e01,
-    1.286100000000000065e01,
-    1.289799999999999969e01,
-    1.320500000000000007e01,
-    1.416600000000000037e01,
-    1.454400000000000048e01,
-    1.471799999999999997e01,
+    1.171399999999999997e00,
+    1.414199999999999902e00,
+    2.901800000000000157e00,
+    2.927299999999999791e00,
+    5.381999999999999673e00,
+    5.439000000000000057e00,
+    7.264599999999999724e00,
+    7.332099999999999618e00,
+    7.495199999999999640e00,
+    7.561600000000000321e00,
+    8.618399999999999395e00,
+    8.713800000000000878e00,
+    1.250699999999999967e01,
+    1.265300000000000047e01,
+    1.289199999999999946e01,
+    1.718299999999999983e01,
+    1.740399999999999991e01,
+    1.863400000000000034e01,
+    1.925400000000000134e01,
+    1.935000000000000142e01,
 ]
 
 REF_DIRS = {
     1: "inline",
     2: "cross-flow",
-    3: "cross-flow",
-    4: "inline",
-    5: "cross-flow",
-    6: "inline",
-    7: "cross-flow",
-    8: "cross-flow",
-    9: "inline",
-    10: "inline",
-    11: "cross-flow",
-    12: "inline",
-    13: "cross-flow",
-    14: "inline",
+    3: "inline",
+    4: "cross-flow",
+    5: "inline",
+    6: "cross-flow",
+    7: "inline",
+    8: "inline",
+    9: "cross-flow",
+    10: "cross-flow",
+    11: "inline",
+    12: "cross-flow",
+    13: "inline",
+    14: "cross-flow",
     15: "axial",
-    16: "cross-flow",
+    16: "inline",
     17: "cross-flow",
     18: "inline",
     19: "inline",

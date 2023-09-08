@@ -9,11 +9,13 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-Seabed = namedtuple("Seabed", "K_vert_sta K_ax_dyn K_vert_dyn K_lat_dyn mu_ax")
+Seabed = namedtuple("Seabed", "K_vert_sta K_ax_dyn mu_ax C_V C_L nu")
 
 Model = namedtuple(
     "Model", "span_length span_height total_length element_length g water_depth rho_sw"
 )
+
+System = namedtuple("System", "abaqus_bat_path")
 
 
 def get_A(od: float, id: float = 0):
@@ -32,11 +34,15 @@ class Pipe:
     Pi: float
     T: float
 
-    def get_rho_eff(self):
+    def _get_total_mass(self):
         A_steel = get_A(self.od, self.od - 2 * self.wt)
         m_steel = A_steel * self.rho_steel
         m_contents = get_A(self.od - 2 * self.wt) * self.rho_contents
-        return (m_steel + m_contents) / A_steel
+        return m_steel + m_contents
+
+    def get_rho_eff(self):
+        A_steel = get_A(self.od, self.od - 2 * self.wt)
+        return self._get_total_mass() / A_steel
 
     def get_sigma_ax(self):
         A_steel = get_A(self.od, self.od - 2 * self.wt)
@@ -47,17 +53,24 @@ class Pipe:
         )
         return eaf / A_steel
 
+    def get_rho_s_rho(self, rho_seawater):
+        A_OA = get_A(self.od)
+        m_total = self._get_total_mass()
+        rho_pipe = m_total / A_OA
+        return rho_pipe / rho_seawater
+
 
 def get_mode_shapes(
     model_path,
     model: Model,
     pipe: Pipe,
     seabed: Seabed,
+    system: System,
 ):
-    run_in_place(model_path, model, pipe, seabed)
-    pp_in_place(model_path)
-    run_modal(model_path, pipe, seabed, model)
-    pp_modal(model_path)
+    run_in_place(model_path, model, pipe, seabed, system)
+    pp_in_place(model_path, system)
+    run_modal(model_path, pipe, seabed, model, system)
+    pp_modal(model_path, system)
     plot_modes(model_path, model.element_length)
 
 
@@ -66,11 +79,12 @@ def run_in_place(
     model: Model,
     pipe: Pipe,
     seabed: Seabed,
+    system: System,
 ):
     write_in_place_input_file(model_path, model, pipe, seabed)
     subprocess.run(
         [
-            "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+            system.abaqus_bat_path,
             "j=in_place",
             "ask_delete=no",
             "cpus=2",
@@ -168,10 +182,10 @@ def write_in_place_input_file(
         )
 
 
-def pp_in_place(model_path):
+def pp_in_place(model_path, system: System):
     write_in_place_pp_file(model_path)
     subprocess.run(
-        ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "in_place_pp.py"],
+        [system.abaqus_bat_path, "python", "in_place_pp.py"],
         cwd=model_path,
     )
 
@@ -219,11 +233,11 @@ def write_in_place_pp_file(model_path):
         )
 
 
-def run_modal(model_path, pipe: Pipe, seabed: Seabed, model: Model):
+def run_modal(model_path, pipe: Pipe, seabed: Seabed, model: Model, system: System):
     write_modal_inp(model_path, pipe, seabed, model)
     subprocess.run(
         [
-            "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat",
+            system.abaqus_bat_path,
             "j=modal",
             "ask_delete=no",
             "cpus=2",
@@ -280,10 +294,10 @@ def write_modal_inp(model_path, pipe: Pipe, seabed: Seabed, model: Model):
                 {seabed.K_ax_dyn*model.element_length:9.3e}
                 *SPRING, ELSET=SPR_VERT
                 2
-                {seabed.K_vert_dyn*model.element_length:9.3e}
+                {get_K_V_d(pipe, seabed, model)*model.element_length:9.3e}
                 *SPRING, ELSET=SPR_LAT
                 3
-                {seabed.K_lat_dyn*model.element_length:9.3e}
+                {get_K_L_d(pipe, seabed, model)*model.element_length:9.3e}
                 *AQUA
                 -{model.water_depth}, 0., {model.g}, {model.rho_sw}
                 *INITIAL CONDITIONS, TYPE=STRESS
@@ -355,10 +369,10 @@ def get_added_mass(e, D):
     return 1
 
 
-def pp_modal(model_path):
+def pp_modal(model_path, system: System):
     write_modal_pp_file(model_path)
     subprocess.run(
-        ["C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat", "python", "modal_pp.py"],
+        [system.abaqus_bat_path, "python", "modal_pp.py"],
         cwd=model_path,
     )
 
@@ -396,28 +410,12 @@ def write_modal_pp_file(model_path):
         )
 
 
-def cli(input_file_path, model_path=None):
-    import tomllib
-    import os
-
-    if model_path is None:
-        model_path = os.getcwd()
-
-    f = Path(input_file_path)
-    with open(f, "rb") as i:
-        inputs = tomllib.load(i)
-
-    pipe = Pipe(**inputs["Pipe"])
-    model = Model(**inputs["Model"])
-    seabed = Seabed(**inputs["Seabed"])
-
-    get_mode_shapes(model_path, model, pipe, seabed)
-
-
 def plot_modes(model_path, element_length):
     modes = get_modes(model_path)
     pts = modes[1]["mode_shape"].shape[0]
     x = np.linspace(0, (pts - 1) * element_length, pts)
+
+    fig_path = Path(model_path / "mode_shapes.png")
 
     fig, ax = plt.subplots(figsize=(8, 5), layout="constrained")
 
@@ -446,7 +444,7 @@ def plot_modes(model_path, element_length):
         handles[::-1], labels[::-1], title="Frequencies", loc="outside right upper"
     )
     plt.title("Mode Shapes")
-    plt.savefig("mode_shapes.png")
+    plt.savefig(fig_path)
 
 
 def get_modes(model_path):
@@ -498,6 +496,43 @@ def get_direction(ms):
     if d == 1:
         return "cross-flow"
     return "inline"
+
+
+def get_K_V_d(pipe: Pipe, seabed: Seabed, model: Model):
+    return (
+        seabed.C_V
+        / (1 - seabed.nu)
+        * (2 / 3 * pipe.get_rho_s_rho(model.rho_sw) + (1 / 3))
+        * math.sqrt(pipe.od)
+    )
+
+
+def get_K_L_d(pipe: Pipe, seabed: Seabed, model: Model):
+    return (
+        seabed.C_L
+        * (1 + seabed.nu)
+        * (2 / 3 * pipe.get_rho_s_rho(model.rho_sw) + (1 / 3))
+        * math.sqrt(pipe.od)
+    )
+
+
+def cli(input_file_path, model_path=None):
+    import tomllib
+    import os
+
+    if model_path is None:
+        model_path = os.getcwd()
+
+    f = Path(input_file_path)
+    with open(f, "rb") as i:
+        inputs = tomllib.load(i)
+
+    pipe = Pipe(**inputs["Pipe"])
+    model = Model(**inputs["Model"])
+    seabed = Seabed(**inputs["Seabed"])
+    system = System(**inputs["System"])
+
+    get_mode_shapes(model_path, model, pipe, seabed, system)
 
 
 if __name__ == "__main__":

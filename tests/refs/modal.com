@@ -47,7 +47,7 @@ options = {
     'moldflowFiles':[],
     'moldflowMaterial':OFF,
     'mp_file_system':(DETECT, DETECT),
-    'mp_head_node':('wss4lx9474.tp.tpnet.intra', 'wss4lx9474', '192.168.176.1', '10.146.32.68', '172.25.48.1', 'wss4lx9474.mshome.net', '172.26.144.1'),
+    'mp_head_node':('wss4lx9474.tp.tpnet.intra', 'wss4lx9474', '172.31.0.1', '10.146.32.68', '172.19.32.1', 'wss4lx9474.mshome.net', '172.21.144.1'),
     'mp_host_list':(('wss4lx9474', 2),),
     'mp_mode':MPI,
     'mp_mode_requested':MPI,

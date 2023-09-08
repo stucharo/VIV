@@ -1,6 +1,6 @@
 1
 
-   Abaqus 6.14-4                                  Date 08-Aug-2023   Time 15:11:15
+   Abaqus 6.14-4                                  Date 24-Aug-2023   Time 17:19:03
    For use by T_EN NET SAS under license from Dassault Systemes or its subsidiary.
 
 
@@ -201,13 +201,13 @@
 
 
      JOB TIME SUMMARY
-       USER TIME (SEC)      =  0.10000    
-       SYSTEM TIME (SEC)    =  0.20000    
+       USER TIME (SEC)      =  0.20000    
+       SYSTEM TIME (SEC)    =  0.10000    
        TOTAL CPU TIME (SEC) =  0.30000    
        WALLCLOCK TIME (SEC) =          0
 1
 
-   Abaqus 6.14-4                                  Date 08-Aug-2023   Time 15:11:24
+   Abaqus 6.14-4                                  Date 24-Aug-2023   Time 17:19:12
    For use by T_EN NET SAS under license from Dassault Systemes or its subsidiary.
 
                                                                                                STEP    1  INCREMENT    1
@@ -337,7 +337,7 @@
       (6) USING "*RESTART, WRITE" CAN GENERATE A LARGE AMOUNT OF DATA WRITTEN IN THE WORK DIRECTORY.
 1
 
-   Abaqus 6.14-4                                  Date 08-Aug-2023   Time 15:11:26
+   Abaqus 6.14-4                                  Date 24-Aug-2023   Time 17:19:15
    For use by T_EN NET SAS under license from Dassault Systemes or its subsidiary.
 
                                                                                                STEP    2  INCREMENT    1
@@ -412,7 +412,7 @@
 
 
      JOB TIME SUMMARY
-       USER TIME (SEC)      =   3.4000    
-       SYSTEM TIME (SEC)    =   1.1000    
-       TOTAL CPU TIME (SEC) =   4.5000    
+       USER TIME (SEC)      =   3.3000    
+       SYSTEM TIME (SEC)    =   1.3000    
+       TOTAL CPU TIME (SEC) =   4.6000    
        WALLCLOCK TIME (SEC) =          4
