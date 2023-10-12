@@ -4,7 +4,7 @@ import pytest
 
 import numpy as np
 
-import src.modes as m
+import src.utils as utils
 
 
 f = Path("tests/refs/viv.toml")
@@ -14,22 +14,22 @@ with open(f, "rb") as i:
 
 @pytest.fixture
 def seabed():
-    return m.Seabed(**inputs["Seabed"])
+    return utils.Seabed(**inputs["Seabed"])
 
 
 @pytest.fixture
 def pipe():
-    return m.Pipe(**inputs["Pipe"])
+    return utils.Pipe(**inputs["Pipe"])
 
 
 @pytest.fixture
 def model():
-    return m.Model(**inputs["Model"])
+    return utils.Model(**inputs["Model"])
 
 
 @pytest.fixture
 def system():
-    return m.System(**inputs["System"])
+    return utils.System(**inputs["System"])
 
 
 @pytest.fixture

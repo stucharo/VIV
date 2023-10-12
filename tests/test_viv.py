@@ -5,6 +5,7 @@ import shutil
 
 import src.viv as viv
 import src.modes as m
+import tests.conftest as ct
 
 
 def test_cli(mocker, model, pipe, seabed, system):
@@ -31,4 +32,6 @@ def test_plot_modes(tmp_path, model, pipe, seabed, system, mocker):
     viv.plot_modes(tmp_path, pipe, model, seabed, system)
 
     mocked_savefig.assert_called_once_with(Path(tmp_path / "mode_shapes.png"))
-    mocked_get_mode_shapes.assert_called_once_with(tmp_path, model, pipe, seabed, system)
+    mocked_get_mode_shapes.assert_called_once_with(
+        tmp_path, model, pipe, seabed, system
+    )

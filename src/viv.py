@@ -1,9 +1,12 @@
 from pathlib import Path
+from collections import namedtuple
+from dataclasses import dataclass
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .modes import Model, Pipe, Seabed, System, get_mode_shapes
+from .utils import Pipe, Model, Seabed, System
+from .modes import get_mode_shapes
 
 
 def cli(input_file_path, model_path=None):

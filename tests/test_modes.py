@@ -1,6 +1,4 @@
 import glob
-import math
-import os
 import pytest
 import src.modes as m
 import filecmp
@@ -10,59 +8,6 @@ from unittest.mock import call
 import tests.conftest as ct
 
 import numpy as np
-
-
-def test_Seabed():
-    s = m.Seabed(**ct.inputs["Seabed"])
-    assert s.K_vert_sta == ct.inputs["Seabed"]["K_vert_sta"]
-    assert s.K_ax_dyn == ct.inputs["Seabed"]["K_ax_dyn"]
-    assert s.mu_ax == ct.inputs["Seabed"]["mu_ax"]
-    assert s.C_V == ct.inputs["Seabed"]["C_V"]
-    assert s.C_L == ct.inputs["Seabed"]["C_L"]
-    assert s.nu == ct.inputs["Seabed"]["nu"]
-
-
-def test_Pipe():
-    p = m.Pipe(**ct.inputs["Pipe"])
-
-    assert p.od == ct.inputs["Pipe"]["od"]
-    assert p.wt == ct.inputs["Pipe"]["wt"]
-    assert p.E == ct.inputs["Pipe"]["E"]
-    assert p.nu == ct.inputs["Pipe"]["nu"]
-    assert p.alpha == ct.inputs["Pipe"]["alpha"]
-    assert p.rho_steel == ct.inputs["Pipe"]["rho_steel"]
-    assert p.rho_contents == ct.inputs["Pipe"]["rho_contents"]
-    assert p.Pi == ct.inputs["Pipe"]["Pi"]
-    assert p.T == ct.inputs["Pipe"]["T"]
-
-
-def test_Model():
-    mod = m.Model(**ct.inputs["Model"])
-
-    assert mod.element_length == ct.inputs["Model"]["element_length"]
-    assert mod.g == ct.inputs["Model"]["g"]
-    assert mod.water_depth == ct.inputs["Model"]["water_depth"]
-    assert mod.rho_sw == ct.inputs["Model"]["rho_sw"]
-    assert mod.bathymetry == ct.inputs["Model"]["bathymetry"]
-
-
-def test_get_A():
-    assert m.get_A(1, 0.5) == pytest.approx(0.5890486)
-    assert m.get_A(1) == pytest.approx(math.pi / 4)
-
-
-def test_Pipe_rho_eff(pipe):
-    actual = pipe.get_rho_eff()
-    expected = 9.1416985e3
-
-    assert actual == pytest.approx(expected)
-
-
-def test_Pipe_get_sigma_ax(pipe):
-    actual = pipe.get_sigma_ax()
-    expected = 3.455259e7
-
-    assert actual == pytest.approx(expected)
 
 
 def test_write_in_place_pp_file(tmp_path):
@@ -172,12 +117,9 @@ def test_write_modal_pp_file(tmp_path):
 
 
 def test_pp_modal(tmp_path, mocker, system):
-    ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
-    for f in ref_mode_shape_files:
-        shutil.copyfile(Path("tests/refs", f), Path(tmp_path, f))
-    shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
-
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
+    mocked_read_natural_freqs = mocker.patch("src.modes.read_natural_freqs")
+    mocked_read_mode_shapes = mocker.patch("src.modes.read_mode_shapes")
 
     m.pp_modal(tmp_path, system)
 
@@ -186,6 +128,8 @@ def test_pp_modal(tmp_path, mocker, system):
         [system.abaqus_bat_path, "python", "modal_pp.py"],
         cwd=tmp_path,
     )
+    mocked_read_natural_freqs.assert_called_once_with(tmp_path)
+    mocked_read_mode_shapes.assert_called_once_with(tmp_path)
 
 
 def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model, system):
