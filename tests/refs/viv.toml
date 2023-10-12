@@ -18,13 +18,19 @@ C_L = 12500e3
 nu = 0.35
 
 [Model]
-span_length = 40
-span_height = 1
-total_length = 200
 element_length = 1
 g = 9.80665
 water_depth = 150
 rho_sw = 1025
+bathymetry = [
+    [0, 0],
+    [80, 0],
+    [80, -1],
+    [120, -1],
+    [120, 0],
+    [200, 0],
+]
 
 [System]
 abaqus_bat_path = "C:\\SIMULIA\\Abaqus\\Commands\\abaqus.bat"
+cpus = 2

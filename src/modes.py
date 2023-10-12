@@ -7,15 +7,12 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 Seabed = namedtuple("Seabed", "K_vert_sta K_ax_dyn mu_ax C_V C_L nu")
 
-Model = namedtuple(
-    "Model", "span_length span_height total_length element_length g water_depth rho_sw"
-)
+Model = namedtuple("Model", "element_length g water_depth rho_sw bathymetry")
 
-System = namedtuple("System", "abaqus_bat_path")
+System = namedtuple("System", "abaqus_bat_path cpus")
 
 
 def get_A(od: float, id: float = 0):
@@ -70,28 +67,13 @@ def get_mode_shapes(
     run_in_place(model_path, model, pipe, seabed, system)
     pp_in_place(model_path, system)
     run_modal(model_path, pipe, seabed, model, system)
-    pp_modal(model_path, system)
-    plot_modes(model_path, model.element_length)
+    modes = pp_modal(model_path, system)
+    return modes
 
 
-def run_in_place(
-    model_path,
-    model: Model,
-    pipe: Pipe,
-    seabed: Seabed,
-    system: System,
-):
+def run_in_place(model_path, model: Model, pipe: Pipe, seabed: Seabed, system: System):
     write_in_place_input_file(model_path, model, pipe, seabed)
-    subprocess.run(
-        [
-            system.abaqus_bat_path,
-            "j=in_place",
-            "ask_delete=no",
-            "cpus=2",
-            "-int",
-        ],
-        cwd=model_path,
-    )
+    run_abaqus(model_path, "in_place", system)
 
 
 def write_in_place_input_file(
@@ -100,15 +82,17 @@ def write_in_place_input_file(
     pipe: Pipe,
     seabed: Seabed,
 ):
-    number_of_elements = model.total_length * model.element_length
+    number_of_elements = int(
+        (model.bathymetry[-1][0] - model.bathymetry[0][0]) / model.element_length
+    )
     last_node = number_of_elements + 1
     with open(Path(model_path, "in_place.inp"), "w") as i:
         i.write(
             dedent(
                 f"""\
                 *NODE, NSET=PIPELINE
-                1, 0, 0
-                {last_node}, {model.total_length}, 0
+                1, {model.bathymetry[0][0]}, 0
+                {last_node}, {model.bathymetry[-1][0]}, 0
                 *NGEN, NSET=PIPELINE
                 1, {last_node}, 1
                 *ELEMENT, TYPE=PIPE21H, ELSET=PIPELINE
@@ -134,12 +118,16 @@ def write_in_place_input_file(
                 *NODE, NSET=SEABED_REF
                 {last_node+1}, -10, 0
                 *SURFACE, TYPE=SEGMENTS, NAME=SEABED
-                START, -10, 0
-                LINE, {(model.total_length-model.span_length)/2}, 0
-                LINE, {(model.total_length-model.span_length)/2}, -{model.span_height}
-                LINE, {(model.total_length+model.span_length)/2}, -{model.span_height}
-                LINE, {(model.total_length+model.span_length)/2}, 0
-                LINE, {model.total_length+10}, 0
+                START, {model.bathymetry[0][0]-10}, {model.bathymetry[0][1]}
+                """
+            )
+        )
+        for p in model.bathymetry:
+            i.write(f"LINE, {p[0]}, {p[1]}\n")
+        i.write(
+            dedent(
+                f"""\
+                LINE, {model.bathymetry[-1][0]+10}, {model.bathymetry[-1][1]}
                 *SURFACE INTERACTION, NAME=SEABED
                 *SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=LINEAR
                 {seabed.K_vert_sta:.3e}
@@ -184,10 +172,7 @@ def write_in_place_input_file(
 
 def pp_in_place(model_path, system: System):
     write_in_place_pp_file(model_path)
-    subprocess.run(
-        [system.abaqus_bat_path, "python", "in_place_pp.py"],
-        cwd=model_path,
-    )
+    pp_abaqus(model_path, "in_place_pp.py", system)
 
 
 def write_in_place_pp_file(model_path):
@@ -235,16 +220,7 @@ def write_in_place_pp_file(model_path):
 
 def run_modal(model_path, pipe: Pipe, seabed: Seabed, model: Model, system: System):
     write_modal_inp(model_path, pipe, seabed, model)
-    subprocess.run(
-        [
-            system.abaqus_bat_path,
-            "j=modal",
-            "ask_delete=no",
-            "cpus=2",
-            "-int",
-        ],
-        cwd=model_path,
-    )
+    run_abaqus(model_path, "modal", system)
 
 
 def write_modal_inp(model_path, pipe: Pipe, seabed: Seabed, model: Model):
@@ -371,10 +347,9 @@ def get_added_mass(e, D):
 
 def pp_modal(model_path, system: System):
     write_modal_pp_file(model_path)
-    subprocess.run(
-        [system.abaqus_bat_path, "python", "modal_pp.py"],
-        cwd=model_path,
-    )
+    pp_abaqus(model_path, "modal_pp.py", system)
+    modes = get_modes(model_path)
+    return modes
 
 
 def write_modal_pp_file(model_path):
@@ -408,43 +383,6 @@ def write_modal_pp_file(model_path):
                 """
             )
         )
-
-
-def plot_modes(model_path, element_length):
-    modes = get_modes(model_path)
-    pts = modes[1]["mode_shape"].shape[0]
-    x = np.linspace(0, (pts - 1) * element_length, pts)
-
-    fig_path = Path(model_path / "mode_shapes.png")
-
-    fig, ax = plt.subplots(figsize=(8, 5), layout="constrained")
-
-    labels = []
-
-    for k, v in modes.items():
-        d = v["direction"]
-        if d == "inline":
-            color = "b"
-            l = "Inline"
-        elif d == "cross-flow":
-            color = "g"
-            l = "Cross Flow"
-        else:
-            color = "r"
-            l = "Axial"
-        label = f"Mode {k} - {v['frequency']:.2f} Hz ({l})"
-        labels.append(label)
-        ax.plot(x, k + v["mode_shape"][:, 0] * 0.4, color=color, label=label)
-
-    ax.set_yticks(list(modes.keys()))
-    ax.set_xlabel("KP (m)")
-    ax.set_ylabel("Mode")
-    handles, labels = ax.get_legend_handles_labels()
-    fig.legend(
-        handles[::-1], labels[::-1], title="Frequencies", loc="outside right upper"
-    )
-    plt.title("Mode Shapes")
-    plt.savefig(fig_path)
 
 
 def get_modes(model_path):
@@ -516,28 +454,21 @@ def get_K_L_d(pipe: Pipe, seabed: Seabed, model: Model):
     )
 
 
-def cli(input_file_path, model_path=None):
-    import tomllib
-    import os
-
-    if model_path is None:
-        model_path = os.getcwd()
-
-    f = Path(input_file_path)
-    with open(f, "rb") as i:
-        inputs = tomllib.load(i)
-
-    pipe = Pipe(**inputs["Pipe"])
-    model = Model(**inputs["Model"])
-    seabed = Seabed(**inputs["Seabed"])
-    system = System(**inputs["System"])
-
-    get_mode_shapes(model_path, model, pipe, seabed, system)
+def run_abaqus(model_path, jobname, system: System):
+    subprocess.run(
+        [
+            system.abaqus_bat_path,
+            f"j={jobname}",
+            "ask_delete=no",
+            f"cpus={system.cpus}",
+            "-int",
+        ],
+        cwd=model_path,
+    )
 
 
-if __name__ == "__main__":
-    import sys
-
-    input_file = sys.argv[1]
-
-    cli(input_file)
+def pp_abaqus(model_path, script, system: System):
+    subprocess.run(
+        [system.abaqus_bat_path, "python", script],
+        cwd=model_path,
+    )

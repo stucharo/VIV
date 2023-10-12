@@ -14,6 +14,7 @@ __pycache__/
 *.sim
 *.sta
 *.fil
+*.rpy*
 
 # Distribution / packaging
 .Python

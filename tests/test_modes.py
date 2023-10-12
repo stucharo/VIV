@@ -39,13 +39,11 @@ def test_Pipe():
 def test_Model():
     mod = m.Model(**ct.inputs["Model"])
 
-    assert mod.span_length == ct.inputs["Model"]["span_length"]
-    assert mod.span_height == ct.inputs["Model"]["span_height"]
-    assert mod.total_length == ct.inputs["Model"]["total_length"]
     assert mod.element_length == ct.inputs["Model"]["element_length"]
     assert mod.g == ct.inputs["Model"]["g"]
     assert mod.water_depth == ct.inputs["Model"]["water_depth"]
     assert mod.rho_sw == ct.inputs["Model"]["rho_sw"]
+    assert mod.bathymetry == ct.inputs["Model"]["bathymetry"]
 
 
 def test_get_A():
@@ -174,6 +172,11 @@ def test_write_modal_pp_file(tmp_path):
 
 
 def test_pp_modal(tmp_path, mocker, system):
+    ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
+    for f in ref_mode_shape_files:
+        shutil.copyfile(Path("tests/refs", f), Path(tmp_path, f))
+    shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
+
     mocked_subprocess_run = mocker.patch("src.modes.subprocess.run")
 
     m.pp_modal(tmp_path, system)
@@ -243,16 +246,6 @@ def test_get_mode_shapes(tmp_path, mocker, seabed, pipe, model, system):
     assert filecmp.cmp(Path(tmp_path, "modal_pp.py"), Path("tests/refs/modal_pp.py"))
 
 
-def test_cli(mocker, model, pipe, seabed, system):
-    mocked_get_mode_shapes = mocker.patch("src.modes.get_mode_shapes")
-
-    m.cli("tests\\refs\\viv.toml")
-
-    mocked_get_mode_shapes.assert_called_once_with(
-        os.getcwd(), model, pipe, seabed, system
-    )
-
-
 def test_read_natural_freqs(tmp_path):
     shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
 
@@ -290,19 +283,6 @@ def test_get_modes(tmp_path):
     freqs = np.array([(k, actual[k]["frequency"]) for k in actual.keys()])
     for i in [0, 1]:
         assert np.all(np.diff(freqs[:, i]) > 0)
-
-
-def test_plot_modes(tmp_path, model, mocker):
-    ref_mode_shape_files = glob.glob("mode_*.dat", root_dir=Path("tests/refs"))
-    for f in ref_mode_shape_files:
-        shutil.copyfile(Path("tests/refs", f), Path(tmp_path, f))
-    shutil.copyfile(Path("tests/refs/freqs.dat"), Path(tmp_path, "freqs.dat"))
-
-    mocked_savefig = mocker.patch("src.modes.plt.savefig")
-
-    m.plot_modes(tmp_path, model.element_length)
-
-    mocked_savefig.assert_called_once_with(Path(tmp_path / "mode_shapes.png"))
 
 
 def test_get_direction(mode_shape):
